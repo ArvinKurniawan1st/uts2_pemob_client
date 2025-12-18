@@ -16,7 +16,20 @@ class ApiService {
     );
     return jsonDecode(res.body);
   }
-
+  static Future<Map<String, dynamic>> register(
+      String name, String email, String password) async {
+    final res = await http.post(
+      Uri.parse('$baseUrl/auth/register'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'name': name,
+        'email': email,
+        'password': password,
+        'role': 'CLIENT',
+      }),
+    );
+    return jsonDecode(res.body);
+  }
   static Future<List<dynamic>> getProducts() async {
     final res = await http.get(
       Uri.parse('$baseUrl/products'),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:uts2_client/screens/about_page.dart';
 import '../services/api_service.dart';
 import 'order_page.dart';
 import 'weather_page.dart';
@@ -97,6 +98,22 @@ class ProductPage extends StatelessWidget {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(builder: (_) => const WeatherPage()),
+                              );
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: IconButton(
+                            icon: const Icon(Icons.info, color: Colors.white),
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (_) => const AboutPage()),
                               );
                             },
                           ),

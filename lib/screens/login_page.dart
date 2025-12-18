@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import 'product_page.dart';
+import 'register_page.dart'; // Tambahkan import ini
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -63,7 +64,6 @@ class _LoginPageState extends State<LoginPage> {
             colors: [
               Colors.blue.shade900,
               Colors.blue.shade600,
-              Colors.purple.shade600,
             ],
           ),
         ),
@@ -231,7 +231,7 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                   const SizedBox(height: 24),
 
-                  // Sign Up Link
+                  // Sign Up Link - UPDATED
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -241,7 +241,13 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                       TextButton(
                         onPressed: () {
-                          // TODO: Navigate to sign up page
+                          // Navigate ke RegisterPage
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const RegisterPage(),
+                            ),
+                          );
                         },
                         child: const Text(
                           'Daftar',
