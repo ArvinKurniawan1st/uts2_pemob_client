@@ -1,11 +1,21 @@
 import 'package:flutter/material.dart';
-import '../services/api_service.dart';
+import 'package:intl/intl.dart';
+import '../models/cart_item.dart';
+import 'cart_page.dart';
 
 class OrderPage extends StatefulWidget {
-  final int userId;
   final Map product;
+  final List<CartItem> cart;
+  final int userId;
+  final VoidCallback? onCheckoutSuccess; // 👈 TAMBAHKAN CALLBACK
 
-  const OrderPage({super.key, required this.userId, required this.product});
+  const OrderPage({
+    super.key,
+    required this.product,
+    required this.cart,
+    required this.userId,
+    this.onCheckoutSuccess, // 👈 TAMBAHKAN CALLBACK
+  });
 
   @override
   State<OrderPage> createState() => _OrderPageState();
@@ -13,130 +23,113 @@ class OrderPage extends StatefulWidget {
 
 class _OrderPageState extends State<OrderPage> {
   int qty = 1;
-  bool _isLoading = false;
-  final int ongkir = 10000;
+  static const int maxQty = 100;
 
-  int get subtotal => (widget.product['price_per_kg'] as int) * qty;
-  int get total => subtotal + ongkir;
-
-  void submitOrder() async {
-    if (qty <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Jumlah pesanan harus lebih dari 0')),
-      );
-      return;
-    }
-
-    setState(() => _isLoading = true);
-
-    try {
-      final result = await ApiService.createOrder(
-        widget.userId,
-        [
-          {
-            'product_id': widget.product['id'],
-            'quantity': qty
-          }
-        ],
-        ongkir,
-      );
-
-      if (mounted) {
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (_) => AlertDialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.green.shade50,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.check_circle,
-                    color: Colors.green.shade600,
-                    size: 60,
-                  ),
-                ),
-                const SizedBox(height: 20),
-                const Text(
-                  'Pesanan Berhasil!',
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Total Pembayaran',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey.shade600,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Rp ${_formatPrice(result['total'])}',
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.blue.shade700,
-                  ),
-                ),
-                const SizedBox(height: 20),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.pop(context); // Close dialog
-                      Navigator.pop(context); // Back to product page
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue.shade600,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: const Text(
-                      'Kembali',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Gagal membuat pesanan: ${e.toString()}')),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    }
+  double get pricePerKg {
+    final p = widget.product['price_per_kg'];
+    if (p is num) return p.toDouble();
+    if (p is String) return double.tryParse(p) ?? 0.0;
+    return 0.0;
   }
 
-  String _formatPrice(dynamic price) {
-    final priceInt = price is int ? price : int.tryParse(price.toString()) ?? 0;
-    return priceInt.toString().replaceAllMapped(
-      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-          (Match m) => '${m[1]}.',
+  int get subtotal => (pricePerKg * qty).round();
+
+  String rupiah(num value) =>
+      NumberFormat('#,##0', 'id_ID').format(value);
+
+  void addToCartFromOrder() {
+    final index = widget.cart.indexWhere(
+          (item) => item.productId == widget.product['id'],
+    );
+
+    if (index == -1) {
+      widget.cart.add(
+        CartItem(
+          productId: widget.product['id'],
+          name: widget.product['name'],
+          pricePerKg: pricePerKg,
+          quantity: qty,
+        ),
+      );
+    } else {
+      widget.cart[index].quantity += qty;
+    }
+
+    // Get the navigator before popping
+    final navigator = Navigator.of(context);
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+
+    // Pop dulu sebelum show SnackBar
+    navigator.pop();
+
+    // ✨ SNACKBAR CANTIK - Tampilkan setelah pop
+    scaffoldMessenger.showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.check_circle,
+                color: Colors.white,
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Berhasil ditambahkan!',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '$qty kg ${widget.product['name']}',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: Colors.white70,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: Colors.green.shade600,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        margin: const EdgeInsets.all(16),
+        duration: const Duration(seconds: 2),
+        action: SnackBarAction(
+          label: 'Lihat',
+          textColor: Colors.white,
+          onPressed: () {
+            // 👇 KIRIM CALLBACK KE CARTPAGE
+            navigator.push(
+              MaterialPageRoute(
+                builder: (context) => CartPage(
+                  userId: widget.userId,
+                  cartItems: widget.cart,
+                  onCheckoutSuccess: widget.onCheckoutSuccess, // 👈 TERUSKAN CALLBACK
+                ),
+              ),
+            );
+          },
+        ),
+      ),
     );
   }
 
@@ -145,7 +138,6 @@ class _OrderPageState extends State<OrderPage> {
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
-        elevation: 0,
         backgroundColor: Colors.blue.shade700,
         foregroundColor: Colors.white,
         title: const Text(
@@ -159,7 +151,7 @@ class _OrderPageState extends State<OrderPage> {
             child: SingleChildScrollView(
               child: Column(
                 children: [
-                  // Product Info Card
+                  // ===== PRODUCT INFO =====
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(20),
@@ -172,46 +164,27 @@ class _OrderPageState extends State<OrderPage> {
                     ),
                     child: Column(
                       children: [
-                        Container(
-                          width: 80,
-                          height: 80,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: const Icon(
-                            Icons.shopping_bag,
-                            color: Colors.white,
-                            size: 40,
-                          ),
+                        const Icon(
+                          Icons.shopping_bag,
+                          color: Colors.white,
+                          size: 48,
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 12),
                         Text(
                           widget.product['name'],
+                          textAlign: TextAlign.center,
                           style: const TextStyle(
-                            fontSize: 24,
+                            fontSize: 22,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
                           ),
-                          textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 8,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(
-                            'Rp ${_formatPrice(widget.product['price_per_kg'])} / kg',
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
-                            ),
+                        Text(
+                          'Rp ${rupiah(pricePerKg)} / kg',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            color: Colors.white70,
                           ),
                         ),
                       ],
@@ -220,235 +193,121 @@ class _OrderPageState extends State<OrderPage> {
 
                   const SizedBox(height: 20),
 
-                  // Quantity Selector
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Card(
-                      elevation: 2,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(20),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.scale,
-                                  color: Colors.blue.shade700,
-                                ),
-                                const SizedBox(width: 8),
-                                const Text(
-                                  'Jumlah Pesanan',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 16),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Container(
-                                  decoration: BoxDecoration(
-                                    color: qty > 1 ? Colors.blue.shade600 : Colors.grey.shade300,
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: IconButton(
-                                    onPressed: qty > 1
-                                        ? () => setState(() => qty--)
-                                        : null,
-                                    icon: const Icon(Icons.remove, color: Colors.white),
-                                  ),
-                                ),
-                                const SizedBox(width: 30),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 24,
-                                    vertical: 12,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.blue.shade50,
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Text(
-                                    '$qty kg',
-                                    style: TextStyle(
-                                      fontSize: 24,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.blue.shade700,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 30),
-                                Container(
-                                  decoration: BoxDecoration(
-                                    color: Colors.blue.shade600,
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: IconButton(
-                                    onPressed: () => setState(() => qty++),
-                                    icon: const Icon(Icons.add, color: Colors.white),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
+                  // ===== QTY SELECTOR =====
+                  Card(
+                    margin: const EdgeInsets.symmetric(horizontal: 20),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
                     ),
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  // Price Breakdown
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Card(
-                      elevation: 2,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(20),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.receipt_long,
-                                  color: Colors.blue.shade700,
-                                ),
-                                const SizedBox(width: 8),
-                                const Text(
-                                  'Rincian Harga',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        children: [
+                          const Text(
+                            'Jumlah Pesanan',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
                             ),
-                            const SizedBox(height: 16),
-                            _buildPriceRow('Subtotal', subtotal),
-                            const SizedBox(height: 12),
-                            _buildPriceRow('Ongkos Kirim', ongkir),
-                            const SizedBox(height: 12),
-                            const Divider(),
-                            const SizedBox(height: 12),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                const Text(
-                                  'Total',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                Text(
-                                  'Rp ${_formatPrice(total)}',
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              IconButton(
+                                onPressed: qty > 1
+                                    ? () => setState(() => qty--)
+                                    : null,
+                                icon: const Icon(Icons.remove),
+                              ),
+                              Padding(
+                                padding:
+                                const EdgeInsets.symmetric(horizontal: 24),
+                                child: Text(
+                                  '$qty kg',
                                   style: TextStyle(
                                     fontSize: 22,
                                     fontWeight: FontWeight.bold,
                                     color: Colors.blue.shade700,
                                   ),
                                 ),
-                              ],
-                            ),
-                          ],
-                        ),
+                              ),
+                              IconButton(
+                                onPressed: qty < maxQty
+                                    ? () => setState(() => qty++)
+                                    : null,
+                                icon: const Icon(Icons.add),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
                     ),
                   ),
 
-                  const SizedBox(height: 100),
+                  const SizedBox(height: 20),
+
+                  // ===== PRICE PREVIEW =====
+                  Card(
+                    margin: const EdgeInsets.symmetric(horizontal: 20),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Subtotal',
+                            style: TextStyle(fontSize: 16),
+                          ),
+                          Text(
+                            'Rp ${rupiah(subtotal)}',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.blue.shade700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 120),
                 ],
               ),
             ),
           ),
 
-          // Bottom Button
-          Container(
+          // ===== ADD TO CART BUTTON =====
+          Padding(
             padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 10,
-                  offset: const Offset(0, -5),
-                ),
-              ],
-            ),
             child: SizedBox(
               width: double.infinity,
-              height: 54,
+              height: 52,
               child: ElevatedButton(
-                onPressed: _isLoading ? null : submitOrder,
+                onPressed: addToCartFromOrder,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.blue.shade700,
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                   ),
-                  elevation: 2,
                 ),
-                child: _isLoading
-                    ? const SizedBox(
-                  height: 20,
-                  width: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                child: Text(
+                  'Tambah ke Keranjang - Rp ${rupiah(subtotal)}',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
                   ),
-                )
-                    : Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.shopping_cart_checkout),
-                    const SizedBox(width: 12),
-                    Text(
-                      'Buat Pesanan - Rp ${_formatPrice(total)}',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
                 ),
               ),
             ),
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildPriceRow(String label, int price) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 14,
-            color: Colors.grey.shade700,
-          ),
-        ),
-        Text(
-          'Rp ${_formatPrice(price)}',
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ],
     );
   }
 }
