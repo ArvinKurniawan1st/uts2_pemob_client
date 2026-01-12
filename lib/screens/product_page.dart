@@ -9,6 +9,7 @@ import '../services/api_service.dart';
 import '../models/cart_item.dart';
 import 'cart_page.dart';
 import 'order_page.dart';
+import 'order_history_page.dart';
 
 class ProductPage extends StatefulWidget {
   final int userId;
@@ -84,7 +85,7 @@ class _ProductPageState extends State<ProductPage> {
         child: SafeArea(
           child: Column(
             children: [
-              // ===== HEADER (ANTI OVERFLOW) =====
+              // ===== HEADER =====
               Padding(
                 padding: const EdgeInsets.all(16),
                 child: Row(
@@ -130,6 +131,20 @@ class _ProductPageState extends State<ProductPage> {
                           builder: (_) => const AboutPage(),
                         ),
                       ),
+                    ),
+                    const SizedBox(width: 6),
+                    _iconButton(
+                      icon: Icons.inventory_2,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => OrderHistoryPage(
+                              userId: widget.userId,
+                            ),
+                          ),
+                        );
+                      },
                     ),
                     const SizedBox(width: 6),
                     _cartButton(context),
@@ -233,7 +248,6 @@ class _ProductPageState extends State<ProductPage> {
                                   ),
                                   ElevatedButton(
                                     onPressed: () async {
-                                      // 👉 MASUK KE ORDER PAGE DENGAN CALLBACK
                                       await Navigator.push(
                                         context,
                                         MaterialPageRoute(
@@ -242,7 +256,6 @@ class _ProductPageState extends State<ProductPage> {
                                             cart: cart,
                                             userId: widget.userId,
                                             onCheckoutSuccess: () {
-                                              // 🔥 CALLBACK UNTUK REFRESH BADGE
                                               if (mounted) {
                                                 setState(() {
                                                   _cartUpdateCounter++;
@@ -253,7 +266,6 @@ class _ProductPageState extends State<ProductPage> {
                                         ),
                                       );
 
-                                      // 🔥 REFRESH BADGE SETELAH BALIK
                                       if (mounted) setState(() {});
                                     },
                                     style: ElevatedButton.styleFrom(

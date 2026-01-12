@@ -81,6 +81,31 @@ class ApiService {
     return decoded;
   }
 
+  Future<List<dynamic>> getOrderHistory(int userId) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/orders/user/$userId'),
+    );
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      throw Exception('Gagal memuat order history');
+    }
+  }
+
+  Future<List<dynamic>> getOrderItems(int orderId) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/orders/$orderId/items'),
+    );
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      throw Exception('Gagal memuat detail order');
+    }
+  }
+
+
 
   /* ================= WEATHER ================= */
 
@@ -107,15 +132,6 @@ class ApiService {
       final body = jsonDecode(res.body);
       throw Exception(body['error'] ?? 'Server error');
     }
-  }
-
-  static Future<List<dynamic>> getOrderItems(int orderId) async {
-    final res = await http.get(
-      Uri.parse('$baseUrl/orders/$orderId/items'),
-    );
-
-    _validateResponse(res);
-    return jsonDecode(res.body);
   }
 
 }

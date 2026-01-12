@@ -6,7 +6,7 @@ import '../services/api_service.dart';
 class CartPage extends StatefulWidget {
   final int userId;
   final List<CartItem> cartItems;
-  final VoidCallback? onCheckoutSuccess; // 👈 CALLBACK UNTUK NOTIF PRODUCTPAGE
+  final VoidCallback? onCheckoutSuccess;
 
   const CartPage({
     super.key,
