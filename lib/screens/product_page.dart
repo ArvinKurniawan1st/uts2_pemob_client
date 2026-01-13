@@ -21,13 +21,21 @@ class ProductPage extends StatefulWidget {
 
 class _ProductPageState extends State<ProductPage> {
   final List<CartItem> cart = [];
-  int _cartUpdateCounter = 0; // 👈 TAMBAHKAN COUNTER
+  int _cartUpdateCounter = 0;
 
   // ===== SAFE PRICE PARSER =====
   double parsePrice(dynamic value) {
     if (value is num) return value.toDouble();
     if (value is String) return double.tryParse(value) ?? 0.0;
     return 0.0;
+  }
+
+  // ===== PARSE STOCK =====
+  int parseStock(dynamic value) {
+    if (value is int) return value;
+    if (value is String) return int.tryParse(value) ?? 0;
+    if (value is double) return value.toInt();
+    return 0;
   }
 
   String rupiah(num value) =>
@@ -190,96 +198,149 @@ class _ProductPageState extends State<ProductPage> {
                         itemCount: products.length,
                         itemBuilder: (_, i) {
                           final product = products[i];
+                          final stock = parseStock(product['stock']);
+                          final isOutOfStock = stock <= 0;
+
                           return Card(
                             margin:
                             const EdgeInsets.only(bottom: 16),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(16),
                             ),
-                            child: Padding(
-                              padding: const EdgeInsets.all(16),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    width: 60,
-                                    height: 60,
-                                    decoration: BoxDecoration(
-                                      gradient: LinearGradient(
-                                        colors: [
-                                          Colors.blue.shade400,
-                                          Colors.blue.shade600,
-                                        ],
-                                      ),
-                                      borderRadius:
-                                      BorderRadius.circular(12),
-                                    ),
-                                    child: const Icon(
-                                      Icons.shopping_bag,
-                                      color: Colors.white,
-                                      size: 30,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 16),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                      CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          product['name'],
-                                          style: const TextStyle(
-                                            fontSize: 18,
-                                            fontWeight: FontWeight.bold,
-                                          ),
+                            child: Opacity(
+                              opacity: isOutOfStock ? 0.6 : 1.0,
+                              child: Padding(
+                                padding: const EdgeInsets.all(16),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 60,
+                                      height: 60,
+                                      decoration: BoxDecoration(
+                                        gradient: LinearGradient(
+                                          colors: isOutOfStock
+                                              ? [
+                                            Colors.grey.shade400,
+                                            Colors.grey.shade600,
+                                          ]
+                                              : [
+                                            Colors.blue.shade400,
+                                            Colors.blue.shade600,
+                                          ],
                                         ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          'Rp ${rupiah(parsePrice(product['price_per_kg']))} / kg',
-                                          style: TextStyle(
-                                            fontSize: 15,
-                                            color:
-                                            Colors.green.shade700,
-                                            fontWeight:
-                                            FontWeight.w600,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  ElevatedButton(
-                                    onPressed: () async {
-                                      await Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (_) => OrderPage(
-                                            product: product,
-                                            cart: cart,
-                                            userId: widget.userId,
-                                            onCheckoutSuccess: () {
-                                              if (mounted) {
-                                                setState(() {
-                                                  _cartUpdateCounter++;
-                                                });
-                                              }
-                                            },
-                                          ),
-                                        ),
-                                      );
-
-                                      if (mounted) setState(() {});
-                                    },
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor:
-                                      Colors.blue.shade600,
-                                      foregroundColor: Colors.white,
-                                      shape: RoundedRectangleBorder(
                                         borderRadius:
                                         BorderRadius.circular(12),
                                       ),
+                                      child: const Icon(
+                                        Icons.shopping_bag,
+                                        color: Colors.white,
+                                        size: 30,
+                                      ),
                                     ),
-                                    child: const Text('Pesan'),
-                                  ),
-                                ],
+                                    const SizedBox(width: 16),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            product['name'],
+                                            style: const TextStyle(
+                                              fontSize: 18,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            'Rp ${rupiah(parsePrice(product['price_per_kg']))} / kg',
+                                            style: TextStyle(
+                                              fontSize: 15,
+                                              color:
+                                              Colors.green.shade700,
+                                              fontWeight:
+                                              FontWeight.w600,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          // ===== PESAN STOK =====
+                                          Text(
+                                            isOutOfStock
+                                                ? 'Stok Habis'
+                                                : 'Stok: $stock kg',
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              color: isOutOfStock
+                                                  ? Colors.red.shade600
+                                                  : Colors.grey.shade600,
+                                              fontWeight: isOutOfStock
+                                                  ? FontWeight.bold
+                                                  : FontWeight.normal,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    ElevatedButton(
+                                      onPressed: isOutOfStock
+                                          ? null
+                                          : () async {
+                                        // 🔥 REFRESH DATA PRODUK SEBELUM BUKA ORDER PAGE
+                                        final updatedProducts = await ApiService.getProducts();
+                                        final updatedProduct = updatedProducts.firstWhere(
+                                              (p) => p['id'] == product['id'],
+                                          orElse: () => product,
+                                        );
+
+                                        final currentStock = parseStock(updatedProduct['stock']);
+
+                                        if (currentStock <= 0) {
+                                          if (!mounted) return;
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            const SnackBar(
+                                              content: Text('Stok sudah habis!'),
+                                              backgroundColor: Colors.red,
+                                            ),
+                                          );
+                                          setState(() {});
+                                          return;
+                                        }
+
+                                        await Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (_) => OrderPage(
+                                              product: updatedProduct,
+                                              cart: cart,
+                                              userId: widget.userId,
+                                              onCheckoutSuccess: () {
+                                                if (mounted) {
+                                                  setState(() {
+                                                    _cartUpdateCounter++;
+                                                  });
+                                                }
+                                              },
+                                            ),
+                                          ),
+                                        );
+
+                                        if (mounted) setState(() {});
+                                      },
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: isOutOfStock
+                                            ? Colors.grey.shade400
+                                            : Colors.blue.shade600,
+                                        foregroundColor: Colors.white,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                          BorderRadius.circular(12),
+                                        ),
+                                      ),
+                                      child: Text(
+                                        isOutOfStock ? 'Habis' : 'Pesan',
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           );
@@ -327,8 +388,6 @@ class _ProductPageState extends State<ProductPage> {
                   userId: widget.userId,
                   cartItems: cart,
                   onCheckoutSuccess: () {
-                    // 🔥 CALLBACK DIPANGGIL DARI DALAM DIALOG
-                    // SEBELUM NAVIGATOR.POP
                     if (mounted) {
                       setState(() {
                         _cartUpdateCounter++;
@@ -339,7 +398,6 @@ class _ProductPageState extends State<ProductPage> {
               ),
             );
 
-            // Refresh juga saat kembali normal (tanpa checkout)
             if (mounted) {
               setState(() {
                 _cartUpdateCounter++;

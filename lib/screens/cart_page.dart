@@ -120,12 +120,9 @@ class _CartPageState extends State<CartPage> {
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: () {
-                  // 👇 PANGGIL CALLBACK SEBELUM POP
                   widget.onCheckoutSuccess?.call();
 
                   Navigator.pop(context); // Close dialog
-
-                  // 👇 POP SAMPAI KE PRODUCTPAGE (pop semua halaman)
                   Navigator.popUntil(context, (route) => route.isFirst);
                 },
                 style: ElevatedButton.styleFrom(
